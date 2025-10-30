@@ -1,6 +1,8 @@
 from enum import Enum
 import random
 import pygame
+import copy
+import numpy as np
 
 CELL_SIZE = 40
 MARGIN = 5
@@ -46,7 +48,7 @@ class Coord:
         return "Coord({},{})".format(self.x, self.y)
 
     def is_valid(self):
-        return self.x >= 0 and self.y >= 0
+        return self.x >= 0 and self.y >= 0 and self.x < 10 and self.y < 10
 
 
 class Compass(Enum):
@@ -65,10 +67,14 @@ class Compass(Enum):
         return list(Compass)[idx].value
 
 
+def get_occupation_coords(pos: Coord, direction: int, length: int) -> list[Coord]:
+    return [pos + i * Compass.get_coord(direction) for i in range(length)]
+
+
 class Ship:
-    def __init__(self, coord, length):
+    def __init__(self, coord: Coord, length: int, direction: int = 0):
         self.pos = coord
-        self.direction = random.randint(0, 3)
+        self.direction = direction
         self.length = length
 
     def __repr__(self):
@@ -81,8 +87,7 @@ class State_Battleship:
 
     def is_occupied(self, coord):
         for ship in self.ships:
-            for i in range(ship.length):
-                segment = ship.pos + i * Compass.get_coord(ship.direction)
+            for segment in get_occupation_coords(ship.pos, ship.direction, ship.length):
                 if segment == coord:
                     return True
         return False
@@ -90,9 +95,7 @@ class State_Battleship:
     def get_all_occupied(self) -> list[Coord]:
         coords = []
         for ship in self.ships:
-            for i in range(ship.length):
-                segment = ship.pos + i * Compass.get_coord(ship.direction)
-                coords.append(segment)
+            coords.extend(get_occupation_coords(ship.pos, ship.direction, ship.length))
         return coords
 
     def ship_collision(self, ship):
@@ -117,6 +120,129 @@ class State_Battleship:
 
     def __hash__(self):
         return hash(tuple(self.ships))
+
+    def _is_coherent_with_history(
+        self,
+        history: list,
+    ) -> bool:
+        for a, o in history:
+            if o.name == "hit" and not self.is_occupied(a.coord):
+                return False
+            elif o.name == "miss" and self.is_occupied(a.coord):
+                return False
+        return True
+
+    def _ship_swap(self) -> "State_Battleship":
+        """
+        2 ships of different sizes swapped location
+        """
+        while True:
+            i, j = np.random.choice(len(self.ships), 2, replace=False)
+            if all(
+                [
+                    coord.is_valid()
+                    for coord in get_occupation_coords(
+                        self.ships[j].pos, self.ships[j].direction, self.ships[i].length
+                    )
+                ]
+            ) and all(
+                [
+                    coord.is_valid()
+                    for coord in get_occupation_coords(
+                        self.ships[i].pos, self.ships[i].direction, self.ships[j].length
+                    )
+                ]
+            ):
+                new_state = copy.deepcopy(self)
+                new_state.ships[i].pos, new_state.ships[j].pos = (
+                    self.ships[j].pos,
+                    self.ships[i].pos,
+                )
+                return new_state
+
+    def _ship_merge(self) -> "State_Battleship":
+        """2 smaller ships were swapped into the location of 1 larger ship"""
+
+        def triplet_merge(i, j, k) -> "State_Battleship":
+            new_state = copy.deepcopy(self)
+
+            len_i = self.ships[i].length
+            len_k = self.ships[k].length
+
+            new_state.ships[i].pos, new_state.ships[j].pos = self.ships[
+                k
+            ].pos, self.ships[k].pos + len_i * Compass.get_coord(
+                self.ships[k].direction
+            )
+            new_state.ships[i].direction = self.ships[k].direction
+            new_state.ships[j].direction = self.ships[k].direction
+
+            if all(
+                [
+                    coord.is_valid()
+                    for coord in get_occupation_coords(
+                        self.ships[i].pos, self.ships[i].direction, len_k
+                    )
+                ]
+            ) and not self.ship_collision(
+                Ship(self.ships[i].pos, len_k, self.ships[i].direction)
+            ):
+                new_state.ships[k].pos = self.ships[i].pos
+                new_state.ships[k].direction = self.ships[i].direction
+
+            elif all(
+                [
+                    coord.is_valid()
+                    for coord in get_occupation_coords(
+                        self.ships[j].pos, self.ships[j].direction, len_k
+                    )
+                ]
+            ) and not self.ship_collision(
+                Ship(self.ships[j].pos, len_k, self.ships[j].direction)
+            ):
+                new_state.ships[k].pos = self.ships[j].pos
+                new_state.ships[k].direction = self.ships[j].direction
+
+            else:
+                random_coord = Coord(
+                    random.randint(0, 9),
+                    random.randint(0, 9),
+                )
+                random_direction = random.randint(0, 3)
+
+                while not all(
+                    [
+                        coord.is_valid()
+                        for coord in get_occupation_coords(
+                            random_coord, random_direction, len_k
+                        )
+                    ]
+                ):
+                    random_coord = Coord(
+                        random.randint(0, 9),
+                        random.randint(0, 9),
+                    )
+                    random_direction = random.randint(0, 3)
+
+                new_state.ships[k].pos = random_coord
+                new_state.ships[k].direction = random_direction
+            return new_state
+
+        while True:
+            i, j, k = np.random.choice(len(self.ships), 3, replace=False)
+            if self.ships[i].length + self.ships[j].length <= self.ships[k].length:
+                return triplet_merge(i, j, k)
+
+    def _ship_move(self) -> "State_Battleship":
+        """1 to 4 ships were moved to a new location, selected uniformly at random, and accepted if the new configuration was legal"""
+        while True:
+            i, j, k, l = np.random.choice(len(self.ships), 4, replace=False)
+            new_state = copy.deepcopy(self)
+            new_state.ships[i].pos = Coord(random.randint(0, 9), random.randint(0, 9))
+            new_state.ships[j].pos = Coord(random.randint(0, 9), random.randint(0, 9))
+            new_state.ships[k].pos = Coord(random.randint(0, 9), random.randint(0, 9))
+            new_state.ships[l].pos = Coord(random.randint(0, 9), random.randint(0, 9))
+            return new_state
 
     def init_window(self) -> None:
         pygame.init()

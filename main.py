@@ -85,7 +85,7 @@ if __name__ == "__main__":
         agent=battleship_problem.agent,
         max_depth=3,
         discount_factor=0.95,
-        num_sims=1000,
+        num_sims=20000,
         c_UCB=110,
         value_init=-100,
         rollout_policy=battleship_problem.agent.policy_model,
@@ -101,4 +101,9 @@ if __name__ == "__main__":
     print(action, reward, observation)
 
     battleship_problem.agent.update_history(action, observation)
-    planner.update(battleship_problem.agent, action, observation)
+    planner.update(
+        battleship_problem.agent,
+        action,
+        observation,
+        battleship_problem.state_transform_func,
+    )

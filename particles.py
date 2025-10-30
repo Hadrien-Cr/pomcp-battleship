@@ -151,7 +151,7 @@ def sample_explict_models(
 
 
 def particle_reinvigoration(
-    particles: Particles, numparticles, state_transform_func=None
+    particles: Particles, numparticles, history, state_transform_func
 ) -> Particles:
 
     # If not enough particles, introduce artificial noise to existing particles (reinvigoration)
@@ -162,12 +162,13 @@ def particle_reinvigoration(
     if len(newparticles) > numparticles:
         return newparticles
 
+    print("particle_reinvigoration", len(newparticles), numparticles)
     while len(newparticles) < numparticles:
         # need to make a copy otherwise the transform affects states in 'particles'
         next_state = copy.deepcopy(particles.random())
         # Add artificial noise
         if state_transform_func is not None:
-            next_state = state_transform_func(next_state)
+            next_state = state_transform_func(next_state, history)
         newparticles.add(next_state)
 
     return newparticles

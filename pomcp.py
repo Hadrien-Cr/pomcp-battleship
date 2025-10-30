@@ -195,7 +195,7 @@ class POUCT:
         else:
             raise ValueError("Unexpected state; child should not be None")
 
-    def _expand_ornode(self, ornode, history, state=None) -> None:
+    def _expand_ornode(self, ornode, history, state) -> None:
         for action in self.agent.valid_actions(state=state, history=history):
             if ornode[action] is None:
                 history_action_node = ANDNode(self.num_visits_init, self.value_init)
@@ -238,7 +238,7 @@ class POUCT:
                 root = self._get_ORNode()
             if parent is not None:
                 parent[observation] = root
-            self._expand_ornode(root, history, state=state)
+            self._expand_ornode(root, history, state)
             rollout_reward = self._rollout(state, history, depth)
             return rollout_reward
 
@@ -339,7 +339,9 @@ class POMCP(POUCT):
             rollout_policy=rollout_policy,
         )
 
-    def update(self, agent, real_action, real_observation, state_transform_func=None):
+    def update(
+        self, agent, real_action, real_observation, state_transform_func
+    ) -> None:
 
         if not isinstance(agent.cur_belief, Particles):
             raise TypeError(
@@ -347,8 +349,7 @@ class POMCP(POUCT):
                 "POMCP not usable. Please convert it to particles."
             )
         if not hasattr(agent, "tree"):
-            print("Warning: agent does not have tree. Have you planned yet?")
-            return
+            raise ValueError("Warning: agent does not have tree. Have you planned yet?")
 
         if agent.tree[real_action][real_observation] is None:
             # Never anticipated the real_observation. No reinvigoration can happen.
@@ -357,6 +358,7 @@ class POMCP(POUCT):
         # as the updated belief for the agent.
 
         ornode = agent.tree[real_action][real_observation]
+        assert ornode.num_visits > 0  # should have been visited
         children = ornode.children
         agent.tree = RootORNodeParticles(
             agent.tree[real_action][real_observation].num_visits,
@@ -366,10 +368,12 @@ class POMCP(POUCT):
         agent.tree.children = children
 
         tree_belief = agent.tree.belief
+
         agent.set_belief(
             particle_reinvigoration(
                 tree_belief,
                 len(agent.init_belief.particles),
+                history=agent.history,
                 state_transform_func=state_transform_func,
             )
         )

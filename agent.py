@@ -66,6 +66,7 @@ class Agent:
 
     def set_belief(self, belief, prior=False) -> None:
         """set_belief(self, belief, prior=False)"""
+        print("set belief", belief)
         self.cur_belief = belief
         if prior:
             self.init_belief = belief
