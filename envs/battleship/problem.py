@@ -41,11 +41,26 @@ class Problem_Battleship:
             while not next_state._is_coherent_with_history(history):
                 next_state = state._ship_swap()
             return next_state
+
         elif r == 1:
-            next_state = state._ship_merge()
-            while not next_state._is_coherent_with_history(history):
-                next_state = state._ship_merge()
+            next_state_candidates = state._ship_merge()
+            k = 0
+            while not any(
+                next_state._is_coherent_with_history(history) and next_state._is_valid()
+                for next_state in next_state_candidates
+            ):
+                next_state_candidates = state._ship_merge()
+
+            next_state = random.choice(
+                [
+                    next_state
+                    for next_state in next_state_candidates
+                    if next_state._is_coherent_with_history(history)
+                    and next_state._is_valid()
+                ]
+            )
             return next_state
+
         elif r == 2:
             next_state = state._ship_move()
             while not next_state._is_coherent_with_history(history):

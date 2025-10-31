@@ -9,25 +9,25 @@ import random
 
 
 class PolicyModel_Battleship:
-    def sample(self, state: State_Battleship) -> Action_Battleship:
-        return random.choice(self.get_all_actions(state, []))
-
-    def rollout(self, state, *args) -> Action_Battleship:
-        return self.sample(state)
+    def rollout(
+        self,
+        state: State_Battleship,
+        history: list[tuple[Action_Battleship, Observation_Battleship]],
+    ) -> Action_Battleship:
+        return random.choice(self.get_all_actions(state, history))
 
     def get_all_actions(
         self,
         state: State_Battleship,
         history: list[tuple[Action_Battleship, Observation_Battleship]],
     ) -> list[Action_Battleship]:
-        all_actions = [
-            Action_Battleship(coord=Coord(x, y)) for x in range(10) for y in range(10)
-        ]
+        all_actions = self.get_preferred_actions(state)
+        output = []
         all_prev_actions = [a for a, o in history]
-        for a in self.get_preferred_actions(state):
-            if a in all_prev_actions:
-                all_actions.remove(a)
-        return all_actions
+        for a in all_actions:
+            if a not in all_prev_actions:
+                output.append(a)
+        return output
 
     def get_preferred_actions(
         self,

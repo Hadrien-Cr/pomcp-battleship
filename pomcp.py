@@ -110,12 +110,6 @@ class RootORNodeParticles(RootORNode):
         self.belief = belief
 
 
-class RolloutPolicy:
-    def rollout(self, state, history):
-        """rollout(self, State state, tuple history=None)"""
-        pass
-
-
 ###################### POUCT #########################
 
 
@@ -239,7 +233,7 @@ class POUCT:
             if parent is not None:
                 parent[observation] = root
             self._expand_ornode(root, history, state)
-            rollout_reward = self._rollout(state, history, depth)
+            rollout_reward = self.rollout(state, history, depth)
             return rollout_reward
 
         action = self._ucb(root)
@@ -262,7 +256,7 @@ class POUCT:
         ) / (root[action].num_visits)
         return total_reward
 
-    def _rollout(self, state, history, depth) -> float:
+    def rollout(self, state, history, depth) -> float:
 
         discount = 1.0
         total_discounted_reward = 0

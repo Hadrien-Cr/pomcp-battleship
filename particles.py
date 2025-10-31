@@ -150,25 +150,29 @@ def sample_explict_models(
         return next_state, reward
 
 
+from tqdm import tqdm
+
+
 def particle_reinvigoration(
     particles: Particles, numparticles, history, state_transform_func
 ) -> Particles:
-
     # If not enough particles, introduce artificial noise to existing particles (reinvigoration)
     newparticles = copy.deepcopy(particles)
     if len(newparticles) == 0:
         raise ValueError("Particle deprivation.")
-
     if len(newparticles) > numparticles:
         return newparticles
 
-    print("particle_reinvigoration", len(newparticles), numparticles)
-    while len(newparticles) < numparticles:
-        # need to make a copy otherwise the transform affects states in 'particles'
-        next_state = copy.deepcopy(particles.random())
-        # Add artificial noise
-        if state_transform_func is not None:
-            next_state = state_transform_func(next_state, history)
-        newparticles.add(next_state)
+    # Use tqdm to create a progress bar
+    with tqdm(
+        total=numparticles - len(newparticles), desc="Reinvigorating particles"
+    ) as pbar:
+        while len(newparticles) < numparticles:
+            # need to make a copy otherwise the transform affects states in 'particles'
+            state = particles.random()
+            next_state = state_transform_func(state, history)
+
+            newparticles.add(next_state)
+            pbar.update(1)  # Increment the progress bar by one step for each iteration
 
     return newparticles
